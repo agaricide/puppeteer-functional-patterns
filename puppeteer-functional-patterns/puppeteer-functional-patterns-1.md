@@ -1,10 +1,10 @@
 # Practical functional patterns for async flow control with Puppeteer, Part 1
 
-Over the last few weeks Puppeteer tutorials have been extremely popular.<sup>1,</sup><sup>2,</sup><sup>3</sup>  These resources are excellent– they got me interested and up to speed with Puppeteer.  However, some of the beginner-oriented walk-throughs on Puppeteer are written in a messy [imperative](https://stackoverflow.com/questions/17826380/what-is-difference-between-functional-and-imperative-programming-languages) style, with no functions and just 1 long [async IIFE.](https://gist.githubusercontent.com/silent-lad/374eea183f58be5e37962b4302f8970a/raw/19de860bd6bcf63ef3b32b54c03c28a9e39b4b9b/giantLeap.js)  This is useful for explaining the fundamental concepts of the tool's API, but is messy and unmaintanable for larger projects.  Here are some practical functional patterns I used to organize my Puppeteer project and manage async control flow. 
+Over the last few weeks Puppeteer tutorials have been extremely popular.<sup>1,</sup><sup>2,</sup><sup>3</sup>  These resources are excellent– they got me interested and up to speed with Puppeteer.  However, some of the beginner-oriented walk-throughs with Puppeteer are written in a messy [imperative](https://stackoverflow.com/questions/17826380/what-is-difference-between-functional-and-imperative-programming-languages) style, with no functions and just 1 long [async IIFE.](https://gist.githubusercontent.com/silent-lad/374eea183f58be5e37962b4302f8970a/raw/19de860bd6bcf63ef3b32b54c03c28a9e39b4b9b/giantLeap.js)  This is useful for explaining the fundamental concepts of the tool's API, but can get messy and unmaintanable for larger projects.  Here are some practical functional patterns I used to organize my Puppeteer project and manage async control flow. 
 
 ## Organizing Page Interactions
 
-Here is a function that accepts a puppeteer [Browser](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-browser) object a string url.  It creates a [Page](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-page) object, and then scrapes an Array of string tags.  Note that Puppeteer may [not be the ideal tool](https://medium.com/@gajus/it-is-a-really-silly-idea-to-use-puppeteer-to-scrape-the-web-da62a9f3de7e) for every web scraping project.  This is a demonstration.  One can also use this technique with other Page methods, too.
+Here is a function that accepts a puppeteer [Browser](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-browser) object and a string url.  It creates a [Page](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-page) object, and then scrapes an Array of string tags from that page.  Note that Puppeteer may [not be the ideal tool](https://medium.com/@gajus/it-is-a-really-silly-idea-to-use-puppeteer-to-scrape-the-web-da62a9f3de7e) for every web scraping project.  This is a demonstration (one could use this technique to invoke other Page methods, too):
 
 ```
 const async scrapePage = (browser: Browser, url: string) => {
@@ -19,7 +19,7 @@ const async scrapePage = (browser: Browser, url: string) => {
 }
 ```
 
-This looks pretty okay, but imagine that you need to scrape `n` more fields.  In this form, `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could very easily grow to 100+ lines.  Let's extract the `page.evaluate` invocation to a new function:
+This looks pretty okay, but imagine that you want scrape more data.  Say, `n` more fields.  In this form, `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could easily grow to 100+ lines with only a few page actions. Let's extract the `page.evaluate` invocation to a new function and scrape more fields:
 
 ```
 const async scrapeTags = (page: Page) => {
@@ -41,7 +41,7 @@ const async scrapePage = (browser: Browser, url: string) => {
 ```
 Great.  Now the `page.evaluate` is wrapped in a descriptive, self-documenting function.  `scrapePage` looks much cleaner, too.  It's concerns are 1) creating and disposing the page object, and 2) aggregating the results of the Page interations.  This is fine for now.
 
-One point of improvement is the nested returns in the `scrapeTags` method.  We are returning `page.evaluate`, which is immediately returning a mapped array.  We can use ES6 arrow functions to tersely express this, while also eliminating some nesting:
+One point of improvement is the nested `return` in the `scrapeTags` method.  We are returning `page.evaluate`, which is immediately returning a mapped array.  We can use the [implicit return](https://stackoverflow.com/a/28889451/10230843) of an arrow function to more tersely express this, while also eliminating some nesting:
 
 ```
 const scrapeTags = (page: Page) => page.evaluate(() => {
@@ -60,15 +60,15 @@ const async scrapePage = (browser: Browser, url: string) => {
 }
 ```
 
-Done.  Now our page interactions are organized into a handful of small, easy-to-understand functions, and we can easily add more.  Typescript can infer the return type of `scrapeTags` without specifying 
+Done.  Now our page interactions are organized in a handful of small, pure, easy-to-understand functions, and we can easily add more.  They are also easy to order and arrange.  Bonus: Typescript infers the return type of `scrapeTags` for free.
 
 ## A note on using `async` `await` with `Page`
 
-When `await` is used one after another, each is resolved in blocking sequential order.  Sometimes this is what you want (e.g. retrieve a School record to then retrieve a Student record).  However, for a many [I/O bound tasks](https://en.wikipedia.org/wiki/I/O_bound) that don't depend on each other, over using `await` can be unecessarily costly.
+When `await` is used one after another, each await is resolved in blocking sequential order.  Sometimes this is what you want (e.g. retrieve a 1 record to then use that to retrieve a second record).  However, given many [I/O bound tasks](https://en.wikipedia.org/wiki/I/O_bound) that don't depend on each other, over-using `await` can be costly.
 
-In the `scrapePage` method `scrapeTitle` is not invoked until the `scrapeTags` Promise resolves.  However, in this scenario, `await` doesn't cost much. The `Page` object **can only execute 1 `evaluate` at a time**, and thus `scrapeTags`, `scrapeTitle`, and `scrapeAuthor` will be executed in blocking sequential order no matter what.
+In the `scrapePage` method `scrapeTitle` is not invoked until the `scrapeTags` Promise resolves because of `await`. However, in this scenario, it actually doesn't cost much. The `Page` object **can only execute 1 `evaluate` at a time**, and thus `scrapeTags`, `scrapeTitle`, and `scrapeAuthor` will be executed in blocking sequential order no matter what.
 
-Still, I want to note that it's possible to kick off all the `Promise` returning methods at once and wait for each to resolve.  Array destructuring + Promise.all + pure Functions are powerful and expressive in conjuction with `await`:
+I want to note that it's possible to kick off all the `Promise` returning methods at once and waiting for all of them to resolve at the end.  [Destructuring assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment) + [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) + pure functions are powerful and expressive in conjuction with `await`:
 
 ```
 const async scrapePage = (browser: Browser, url: string) => {
@@ -83,7 +83,7 @@ const async scrapePage = (browser: Browser, url: string) => {
 }
 ```
 
-I did benchmarking for my usecase and could not detect a measurable difference in performance.  However, [here]() is a simple example that illustrates the performance benefits of this pattern in I/O bound contexts.
+I benchmarked this for my usecase and did not detect a measurable improvement in performance, therefore it's not worth making `scrapePage` more difficult to understand.  [Here]() is a simple example that illustrates the performance benefits of the destructured promise.all pattern, given I/O bound contexts.
 
 ## Multi-Page async control control
 
@@ -100,7 +100,7 @@ const async scrapePage = (browser: Browser, url: string) => {
 }
 ```
 
-Now we have to scrape 10,000 pages.  How do we do it?  Here is naive first pass:
+**Now we have to scrape 10,000 pages.**  How do we do it?  Here is naive first pass:
  
 ```
 const async scrapePages = (urls: string[]) => {
