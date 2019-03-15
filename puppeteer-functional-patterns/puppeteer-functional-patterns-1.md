@@ -4,9 +4,9 @@ Over the last few weeks Puppeteer tutorials have been extremely popular.<sup>1,<
 
 ## Organizing Page Interactions
 
-Here is a function that accepts a puppeteer [Browser](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-browser) object and a string url.  It creates a [Page](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-page) object, and then scrapes an Array of string tags from that page.  Note that Puppeteer may [not be the ideal tool](https://medium.com/@gajus/it-is-a-really-silly-idea-to-use-puppeteer-to-scrape-the-web-da62a9f3de7e) for every web scraping project.  This is a demonstration (one could use this technique to invoke other Page methods, too):
+Here is a function that accepts a puppeteer [Browser](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-browser) object and a string url.  It creates a [Page](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-page) object, and then scrapes an Array of string tags from that page.  Note that Puppeteer may [not be the ideal tool](https://medium.com/@gajus/it-is-a-really-silly-idea-to-use-puppeteer-to-scrape-the-web-da62a9f3de7e) for every web scraping project (one could use this technique to invoke other Page methods, too):
 
-```
+```typescript
 const async scrapePage = (browser: Browser, url: string) => {
   const page = browser.newPage()
   const tags = await page.evaluate(() => {
@@ -19,10 +19,10 @@ const async scrapePage = (browser: Browser, url: string) => {
 }
 ```
 
-This looks pretty okay, but imagine that you want scrape more data.  Say, `n` more fields.  In this form, `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could easily grow to 100+ lines with only a few page actions. Let's extract the `page.evaluate` invocation to a new function and scrape more fields:
+This looks pretty okay, but imagine that you want scrape more data.  Say, `n` more fields.  In this form, `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could easily grow to 100+ lines with only a few page actions. Let's extract the `page.evaluate` invocation to a new function and scrape some more fields:
 
-```
-const async scrapeTags = (page: Page) => {
+```typescript
+const scrapeTags = (page: Page) => {
   return page.evaluate(() => {
     return Array.from(document.querySelectorAll('.tags'))
       .map(el => el.innerHTML)
@@ -30,7 +30,7 @@ const async scrapeTags = (page: Page) => {
   });
 });
 
-const async scrapePage = (browser: Browser, url: string) => {
+const scrapePage = async (browser: Browser, url: string) => {
   const page = browser.newPage()
   const tags = await scrapeTags(page);
   const title = await scrapeTitle(page);
@@ -43,14 +43,14 @@ Great.  Now the `page.evaluate` is wrapped in a descriptive, self-documenting fu
 
 One point of improvement is the nested `return` in the `scrapeTags` method.  We are returning `page.evaluate`, which is immediately returning a mapped array.  We can use the [implicit return](https://stackoverflow.com/a/28889451/10230843) of an arrow function to more tersely express this, while also eliminating some nesting:
 
-```
+```typescript
 const scrapeTags = (page: Page) => page.evaluate(() => {
   return Array.from(document.querySelectorAll('.tags'))
     .map(el => el.innerHTML)
     .map(s => s.toLowerCase());
 });
 
-const async scrapePage = (browser: Browser, url: string) => {
+const scrapePage = async (browser: Browser, url: string) => {
   const page = browser.newPage()
   const tags = await scrapeTags(page);
   const title = await scrapeTitle(page);
@@ -70,8 +70,8 @@ In the `scrapePage` method `scrapeTitle` is not invoked until the `scrapeTags` P
 
 I want to note that it's possible to kick off all the `Promise` returning methods at once and waiting for all of them to resolve at the end.  [Destructuring assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment) + [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) + [pure functions](https://medium.com/javascript-scene/master-the-javascript-interview-what-is-a-pure-function-d1c076bec976) can be useful and expressive with `await`:
 
-```
-const async scrapePage = (browser: Browser, url: string) => {
+```typescript
+const scrapePage = async (browser: Browser, url: string) => {
   const page = browser.newPage();
   const [tags, title, author] = await Promise.all([
     scrapeTags(page),
@@ -85,12 +85,12 @@ const async scrapePage = (browser: Browser, url: string) => {
 
 I benchmarked this for my usecase and did not detect a measurable improvement in performance.  [Here]() is a simple example that illustrates the performance benefits of the destructured promise.all pattern, given I/O bound contexts.
 
-## Multi-Page async control control
+## Multi-Page async flow control
 
 At now have this `scrapePage` function:
 
-```
-const async scrapePage = (browser: Browser, url: string) => {
+```typescript
+const scrapePage = async (browser: Browser, url: string) => {
   const page = browser.newPage()
   const tags = await scrapeTags(page);
   const title = await scrapeTitle(page);
@@ -102,14 +102,51 @@ const async scrapePage = (browser: Browser, url: string) => {
 
 **Now we have to scrape 10,000 pages.**  How do we do it?  Here is naive first pass:
  
-```
-const async scrapePages = (urls: string[]) => {
-  const browser = await puppeteer.launch();
+```typescript
+const scrapePages = async (browser: Browser, urls: string[]) => {
   const results = [];
   for (const url of urls) {
-    const mugshot = await scrapeMugshot(browser, url); 
-    results.push(mugshot);   
+    const page = await scrapePage(browser, url); 
+    results.push(page);   
   }
   return results;
+}
+```
+
+```typescript
+const scrapePages = async (browser: Browser, urls: string[]) => {
+  const promises = urls.map(url => scrapePage(browser, url));
+  const result: any[] = Promise.all(promises);
+  return result;
+}
+```
+
+
+```typescript
+import * as pool from 'generic-pool';
+
+const scrapePage = async (page: Page, url: string) => {
+  const tags = await scrapeTags(page);
+  const title = await scrapeTitle(page);
+  const author = await scrapeAuthor(page);
+  return { tags, title, author };
+};
+
+const pageFactory = (browser: Browser) => {
+  return {
+    create: () => browser.newPage(),
+    destroy: (page: Page) => page.close()
+  };
+};
+
+const scapePages = async (browser: Browser, urls: string[]) => {
+  const pagePool = pool.createPool(pageFactory(browser), { max: 10 });
+  const promises = urls.map(async (url) => {
+    const page = await pagePool.acquire();
+    const data = await scrapeMugshot(page, url);
+    pagePool.release(page);
+    return data;
+  });
+  return Promise.all(promises);
 }
 ```
