@@ -68,7 +68,7 @@ When `await` is used one after another, each await is resolved in blocking seque
 
 In the `scrapePage` method `scrapeTitle` is not invoked until the `scrapeTags` Promise resolves because of `await`. However, in this scenario, it actually doesn't cost much. The `Page` object **can only execute 1 `evaluate` at a time**, and thus `scrapeTags`, `scrapeTitle`, and `scrapeAuthor` will be executed in blocking sequential order no matter what.
 
-I want to note that it's possible to kick off all the `Promise` returning methods at once and waiting for all of them to resolve at the end.  [Destructuring assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment) + [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) + pure functions are powerful and expressive in conjuction with `await`:
+I want to note that it's possible to kick off all the `Promise` returning methods at once and waiting for all of them to resolve at the end.  [Destructuring assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment) + [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) + [pure functions](https://medium.com/javascript-scene/master-the-javascript-interview-what-is-a-pure-function-d1c076bec976) can be useful and expressive with `await`:
 
 ```
 const async scrapePage = (browser: Browser, url: string) => {
@@ -83,11 +83,11 @@ const async scrapePage = (browser: Browser, url: string) => {
 }
 ```
 
-I benchmarked this for my usecase and did not detect a measurable improvement in performance, therefore it's not worth making `scrapePage` more difficult to understand.  [Here]() is a simple example that illustrates the performance benefits of the destructured promise.all pattern, given I/O bound contexts.
+I benchmarked this for my usecase and did not detect a measurable improvement in performance.  [Here]() is a simple example that illustrates the performance benefits of the destructured promise.all pattern, given I/O bound contexts.
 
 ## Multi-Page async control control
 
-We now have this `scrapePage` function:
+At now have this `scrapePage` function:
 
 ```
 const async scrapePage = (browser: Browser, url: string) => {
