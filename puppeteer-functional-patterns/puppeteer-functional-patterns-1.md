@@ -146,7 +146,7 @@ const scrapePage = async (page: Page, url: string) => {
 };
 
 const scapePages = async (browser: Browser, urls: string[]) => {
-  const pagePool = pool.createPool(pageFactory(browser), { max: 2s });
+  const pagePool = pool.createPool(pageFactory(browser), { max: 5 });
   const promises = urls.map(async (url) => {
     const page = await pagePool.acquire();
     const data = await scrapeMugshot(page, url);
@@ -157,4 +157,6 @@ const scapePages = async (browser: Browser, urls: string[]) => {
 }
 ```
 
-Each concurrent async function first   
+Each concurrent async function that is invoked as we `map` over the `urls` array calls `pagePool.acquire`.  We set `{ max: 5 }`, so the first 5 functions immediately acquire puppeteer Pages.  The remaining functions' execution is paused until one of the first 5 functions call `pagePool.release` and the `pagePool` disposes of the Page.
+
+We can easily specify the number of max Pages open concurrently.  This throttling solves the Node crashing, website nuking, and TOS violating problems.  It also removes Page creating responsibilities from `scrapePage`, which now _only_ aggregates page interactions.  It better seperates concerns.  However it does add non-trivial [conceptual complexity](http://reviewthecode.blogspot.com/2016/01/wtf-per-minute-actual-measurement-for.html) to our `scapePages` implementation.
