@@ -19,7 +19,7 @@ const async scrapePage = (browser: Browser, url: string) => {
 }
 ```
 
-This looks okay, but imagine that you want scrape more data.  Say, `n` more fields.  In this form, `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could easily grow to 100+ lines with only a few page actions. Let's extract the `page.evaluate` invocation to a new function and scrape some more fields:
+This looks okay, but imagine that you want scrape more data.  Say, `n` more fields.  In this form, `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could easily grow to 100+ lines with only a few interactions. Let's extract the `page.evaluate` invocation to a new function and scrape some more fields:
 
 ```typescript
 const scrapeTags = (page: Page) => {
@@ -60,13 +60,13 @@ const scrapePage = async (browser: Browser, url: string) => {
 }
 ```
 
-Done.  Now our page interactions are organized in a handful of small, pure, easy-to-understand functions, and we can easily add more.  They are also easy to order and arrange.  Bonus: Typescript infers the return type of `scrapeTags` for free.
+Done.  Now our page interactions are organized into a handful of small, pure, easy-to-understand functions, and we can easily add more.  They are also easy to order and arrange.  Bonus: Typescript infers the return type of `scrapeTags` for free.
 
 ## A note on using `async` `await` with `Page`
 
 When `await` is used one after another, each await is resolved in blocking sequential order.  Sometimes this is what you want (e.g. retrieve a 1 record to then use that to retrieve a second record).  However, given many [I/O bound tasks](https://en.wikipedia.org/wiki/I/O_bound) that don't depend on each other, over-using `await` can be costly.
 
-In the `scrapePage` method `scrapeTitle` is not invoked until the `scrapeTags` Promise resolves because of `await`. However, in this scenario, it actually doesn't cost much. The `Page` object **can only execute 1 `evaluate` at a time**, and thus `scrapeTags`, `scrapeTitle`, and `scrapeAuthor` will be executed in blocking sequential order no matter what.
+In the `scrapePage` method, `scrapeTitle` is not invoked until `tags` is resolved because of `await`. However, here it actually doesn't cost much. The `Page` object **can only execute 1 `evaluate` at a time**, and thus `scrapeTags`, `scrapeTitle`, and `scrapeAuthor` will be executed in blocking sequential order no matter what.
 
 I want to note that it's possible to kick off all the `Promise` returning methods at once and waiting for all of them to resolve at the end.  [Destructuring assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment) + [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) + [pure functions](https://medium.com/javascript-scene/master-the-javascript-interview-what-is-a-pure-function-d1c076bec976) can be useful and expressive with `await`:
 
@@ -113,7 +113,7 @@ const scrapePages = async (browser: Browser, urls: string[]) => {
 }
 ```
 
-Reasonable attempt.  But remember that each await is resolved in sequential blocking order.  In the function above, we will always be scraping 1 page at a time.  The `await`ed `scrapePage` resolves, then is `push`ed into the results, and then the loop repeats.  This is fine for a few hundred pages, but could be improved given 5,000+ web pages.  Can we make it better, faster, and more functional?  Loading web pages is asynchronous I/O.  We could open many pages at once to improve CPU utilization as we wait for other page requests to resolve:
+Reasonable attempt.  But remember that each await is resolved in sequential blocking order?  In the function above, we will always be scraping 1 page at a time.  The `await`ed `scrapePage` resolves, then is `push`ed into the results, and then the loop repeats.  This is fine for a few hundred pages, but could be improved given 5,000+ web pages.  Can we make it better, faster, and more functional?  Loading web pages is asynchronous I/O.  We could open many pages at once to improve CPU utilization as we wait for other page requests to resolve:
 
 ```typescript
 const scrapePages = async (browser: Browser, urls: string[]) => {
@@ -125,7 +125,7 @@ const scrapePages = async (browser: Browser, urls: string[]) => {
 
 Here a naive attempt at opening many pages up in parallel.  It attempts to open up 5,000 headless Chrome windows at once, and it's aweful.  It will crash Node.  It will also nuke the website that is being scraped.  If one is trying to scrape data from a website and that is against the TOS, this might get them in trouble.  Likewise for API request limits.  Opening 5,000 Chrome windows at once is an accident under most circumstances.
 
-How to improve, then? Conceptually, one can think of Puppeteer's Headless Chrome browser as a [shared resource.](https://pdfs.semanticscholar.org/ba17/4c6f41a24a54726eaf81c187a8dd7907766c.pdf)  In this scenario, we want to throttle the amount of pages that are spawned by the browser as we map over our list of page uri's.  We can use the npm package [generic-pool](https://github.com/coopernurse/node-pool#readme) to make a shared [pool](https://github.com/coopernurse/node-pool#createpool) of Puppeteer Pages.  To do so we will pull `browser.newPage()` out of `scrapePage`, and make a simple `pageFactory`, which specifies how our pool will `create` and `destroy` pages:
+How to improve, then? Conceptually, one can think of Puppeteer's Headless Chrome browser as a [shared resource.](https://pdfs.semanticscholar.org/ba17/4c6f41a24a54726eaf81c187a8dd7907766c.pdf)  In this scenario, we want to throttle the amount of pages that are spawned by the browser as we map over our list of page uri's.  We can use the npm package [generic-pool](https://github.com/coopernurse/node-pool#readme) to make a shared [pool](https://github.com/coopernurse/node-pool#createpool) of Puppeteer Pages.  To do so we will pull `browser.newPage()` out of `scrapePage`, and make a simple `pageFactory` to specify how our pool will `create` and `destroy` pages:
 
 
 ```typescript
