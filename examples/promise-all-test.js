@@ -1,7 +1,7 @@
 const { performance } = require('perf_hooks');
 
-// This example illustrates the performance benefits of 'promise.all'
-// in I/O bound contexts.
+// This example illustrates the performance benefits of using 'promise.all'
+// in I/O bound contexts (versus a control that uses multiple awaits).
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
