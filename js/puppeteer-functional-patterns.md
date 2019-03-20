@@ -1,6 +1,6 @@
 # Practical functional patterns for async flow control with Puppeteer
 
-#### This uses Typescript.  [Javascript version.]()
+#### This uses Javascript.  [Typescript version.]()
 
 Puppeteer tutorials have been extremely popular recently.<a href="https://www.reddit.com/r/javascript/search?q=puppeteer&restrict_sr=1"><sup>1,</sup></a><a href="https://www.youtube.com/watch?v=pixfH6yyqZk"><sup>2,</sup></a><a href="https://medium.com/@e_mad_ehsan/getting-started-with-puppeteer-and-chrome-headless-for-web-scrapping-6bf5979dee3e"><sup>3</sup></a>  These resources are excellent– they got me interested and up to speed with Puppeteer.  However, some of the beginner-oriented walk-throughs with Puppeteer are written in a messy [imperative](https://stackoverflow.com/questions/17826380/what-is-difference-between-functional-and-imperative-programming-languages) style, with no functions and just 1 long [async IIFE.](https://gist.githubusercontent.com/silent-lad/374eea183f58be5e37962b4302f8970a/raw/19de860bd6bcf63ef3b32b54c03c28a9e39b4b9b/giantLeap.js)  This is useful for explaining the fundamentals of the API, but can get messy and unmaintainable for larger projects.  Here are some practical functional patterns I used to organize my Puppeteer project and manage async control flow. 
 
@@ -8,8 +8,8 @@ Puppeteer tutorials have been extremely popular recently.<a href="https://www.re
 
 Below is a function that accepts a puppeteer [Browser](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-browser) object and a string url.  It creates a [Page](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-page) object, and then scrapes an Array of string tags from that page.  Note that Puppeteer may [not be the ideal tool](https://medium.com/@gajus/it-is-a-really-silly-idea-to-use-puppeteer-to-scrape-the-web-da62a9f3de7e) for every web scraping project (but one could use this to organize other Page methods, too):
 
-```typescript
-const async scrapePage = (browser: Browser, url: string) => {
+```javascript
+const async scrapePage = (browser, url) => {
   const page = browser.newPage()
   const tags = await page.evaluate(() => {
     return Array.from(document.querySelectorAll('.tags'))
@@ -23,8 +23,8 @@ const async scrapePage = (browser: Browser, url: string) => {
 
 This looks okay, but imagine that you want scrape more data.  Say, `n` more fields.  Here, `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could easily grow to 100+ lines with only a few interactions. Let's extract the `page.evaluate` invocation to a new function and scrape some more fields:
 
-```typescript
-const scrapeTags = (page: Page) => {
+```javascript
+const scrapeTags = (page) => {
   return page.evaluate(() => {
     return Array.from(document.querySelectorAll('.tags'))
       .map(el => el.innerHTML)
@@ -32,7 +32,7 @@ const scrapeTags = (page: Page) => {
   });
 });
 
-const scrapePage = async (browser: Browser, url: string) => {
+const scrapePage = async (browser, url) => {
   const page = browser.newPage()
   const tags = await scrapeTags(page);
   const title = await scrapeTitle(page);
@@ -45,14 +45,14 @@ Great.  Now the `page.evaluate` is wrapped in a descriptive, self-documenting fu
 
 One point of improvement is the nested `return` in the `scrapeTags` method.  We are returning `page.evaluate`, which is then returning a mapped array.  We can use the [implicit return](https://stackoverflow.com/a/28889451/10230843) of an arrow function to more tersely express this, while also eliminating some nesting:
 
-```typescript
-const scrapeTags = (page: Page) => page.evaluate(() => {
+```javascript
+const scrapeTags = (page) => page.evaluate(() => {
   return Array.from(document.querySelectorAll('.tags'))
     .map(el => el.innerHTML)
     .map(s => s.toLowerCase());
 });
 
-const scrapePage = async (browser: Browser, url: string) => {
+const scrapePage = async (browser, url) => {
   const page = browser.newPage()
   const tags = await scrapeTags(page);
   const title = await scrapeTitle(page);
@@ -72,8 +72,8 @@ In the `scrapePage` method, `scrapeTitle` is not invoked until `tags` is resolve
 
 I want to note that it's possible to kick off all the `Promise` returning functions at once, and then wait for all of them to resolve together.  [Destructuring assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment) + [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) + [pure functions](https://medium.com/javascript-scene/master-the-javascript-interview-what-is-a-pure-function-d1c076bec976) can be useful and expressive with `await`:
 
-```typescript
-const scrapePage = async (browser: Browser, url: string) => {
+```javascript
+const scrapePage = async (browser, url) => {
   const page = browser.newPage();
   const [tags, title, author] = await Promise.all([
     scrapeTags(page),
@@ -91,8 +91,8 @@ I benchmarked this for my use case and did not detect a measurable improvement i
 
 At this point we have a `scrapePage` function:
 
-```typescript
-const scrapePage = async (browser: Browser, url: string) => {
+```javascript
+const scrapePage = async (browser, url) => {
   const page = browser.newPage()
   const tags = await scrapeTags(page);
   const title = await scrapeTitle(page);
@@ -104,8 +104,8 @@ const scrapePage = async (browser: Browser, url: string) => {
 
 **But now we have to scrape 5,000 pages.**  How do we do it?  Here is simple first pass:
  
-```typescript
-const scrapePages = async (browser: Browser, urls: string[]) => {
+```javascript
+const scrapePages = async (browser, urls) => {
   const results = [];
   for (const url of urls) {
     const page = await scrapePage(browser, url); 
@@ -117,10 +117,10 @@ const scrapePages = async (browser: Browser, urls: string[]) => {
 
 Reasonable attempt.  But remember that each await is resolved in sequential blocking order?  In the function above, we will always be scraping 1 page at a time.  The `await`ed `scrapePage` resolves, then is `push`ed into the results, and then the loop repeats.  This is fine for a few hundred pages, but could it be improved given 5,000+ web pages?  Can we make it better, faster, and more functional?  Loading web pages is asynchronous I/O.  We could open many pages at once to improve CPU utilization as we wait for other page requests to resolve:
 
-```typescript
-const scrapePages = (browser: Browser, urls: string[]) => {
+```javascript
+const scrapePages = (browser, urls) => {
   const promises = urls.map(url => scrapePage(browser, url));
-  const result: any[] = Promise.all(promises);
+  const result = Promise.all(promises);
   return result;
 }
 ```
@@ -130,24 +130,24 @@ This is a naive attempt at opening many pages in parallel.  It attempts to open 
 How to improve, then? Conceptually, one can think of Puppeteer's headless Chrome browser as a [shared resource.](https://pdfs.semanticscholar.org/ba17/4c6f41a24a54726eaf81c187a8dd7907766c.pdf)  In this scenario, we want to throttle the amount of pages that are spawned by the shared resource as we map over our list of page urls.  We can model this with the npm package [generic-pool](https://github.com/coopernurse/node-pool#readme) to make a shared [pool](https://github.com/coopernurse/node-pool#createpool) of Puppeteer Pages.  We will pull `browser.newPage()` out of `scrapePage`, and then make a simple `pageFactory` to specify how our pool will `create` and `destroy` pages:
 
 
-```typescript
+```javascript
 import * as pool from 'generic-pool';
 
-const pageFactory = (browser: Browser) => {
+const pageFactory = (browser) => {
   return {
     create: () => browser.newPage(),
-    destroy: (page: Page) => page.close()
+    destroy: (page) => page.close()
   };
 };
 
-const scrapePage = async (page: Page, url: string) => {
+const scrapePage = async (page, url) => {
   const tags = await scrapeTags(page);
   const title = await scrapeTitle(page);
   const author = await scrapeAuthor(page);
   return { tags, title, author };
 };
 
-const scapePages = async (browser: Browser, urls: string[]) => {
+const scapePages = async (browser, urls) => {
   const pagePool = pool.createPool(pageFactory(browser), { max: 5 });
   const tasks = urls.map(async (url) => {
     const page = await pagePool.acquire();
