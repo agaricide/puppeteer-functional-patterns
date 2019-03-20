@@ -1,6 +1,6 @@
 # Practical functional patterns for async flow control with Puppeteer
 
-#### This uses Javascript.  [Typescript version](https://github.com/agaricide/puppeteer-functional-patterns/blob/master/ts/puppeteer-functional-patterns.md)
+#### This uses JavaScript.  [TypeScript version](https://github.com/agaricide/puppeteer-functional-patterns/blob/master/ts/puppeteer-functional-patterns.md)
 
 Puppeteer tutorials have been extremely popular recently.<a href="https://www.reddit.com/r/javascript/search?q=puppeteer&restrict_sr=1"><sup>1,</sup></a><a href="https://www.youtube.com/watch?v=pixfH6yyqZk"><sup>2,</sup></a><a href="https://medium.com/@e_mad_ehsan/getting-started-with-puppeteer-and-chrome-headless-for-web-scrapping-6bf5979dee3e"><sup>3</sup></a>  These resources are excellent– they got me interested and up to speed with Puppeteer.  However, some of the beginner-oriented walk-throughs with Puppeteer are written in a messy [imperative](https://stackoverflow.com/questions/17826380/what-is-difference-between-functional-and-imperative-programming-languages) style, with no functions and just 1 long [async IIFE.](https://gist.githubusercontent.com/silent-lad/374eea183f58be5e37962b4302f8970a/raw/19de860bd6bcf63ef3b32b54c03c28a9e39b4b9b/giantLeap.js)  This is useful for explaining the fundamentals of the API, but can get messy and unmaintainable for larger projects.  Here are some practical functional patterns I used to organize my Puppeteer project and manage async control flow. 
 
