@@ -83,7 +83,7 @@ const scrapePage = async (browser: Browser, url: string) => {
 }
 ```
 
-I benchmarked this for my use case and did not detect a measurable improvement in performance.  However, [here]() is a simple example that illustrates the performance benefits of promise.all in I/O bound contexts.
+I benchmarked this for my use case and did not detect a measurable improvement in performance.  However, [here](https://github.com/agaricide/puppeteer-functional-patterns/blob/master/examples/promise-all-test.js) is a simple example that illustrates the performance benefits of promise.all in I/O bound contexts.
 
 ## Multi-Page async flow control
 
