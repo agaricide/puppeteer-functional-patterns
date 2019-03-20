@@ -1,0 +1,3 @@
+## Usage
+
+`node <example.js>`
