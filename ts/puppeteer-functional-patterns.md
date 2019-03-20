@@ -123,9 +123,9 @@ const scrapePages = async (browser: Browser, urls: string[]) => {
 }
 ```
 
-This is a naive attempt at opening many pages up in parallel.  It attempts to open up 5,000 headless Chrome windows at once, and it's awful.  It will crash Node.  It will also nuke the website that is being scraped.  If one is trying to scrape data from a website and that is against the TOS, this might get them in trouble.  Likewise if the website has API limits.  Opening 5,000 Chrome windows at once is an accident under most circumstances.
+This is a naive attempt at opening many pages in parallel.  It attempts to open up 5,000 headless Chrome windows at once, and it's awful.  It will crash Node.  It will also nuke the website that is being scraped.  If one is trying to scrape data from a website and that is against the TOS, this might get them in trouble.  Likewise if the website has API limits.  Opening 5,000 Chrome windows at once is an accident under most circumstances.
 
-How to improve, then? Conceptually, one can think of Puppeteer's Headless Chrome browser as a [shared resource.](https://pdfs.semanticscholar.org/ba17/4c6f41a24a54726eaf81c187a8dd7907766c.pdf)  In this scenario, we want to throttle the amount of pages that are spawned by the shared resource as we map over our list of page urls.  We can model this with the npm package [generic-pool](https://github.com/coopernurse/node-pool#readme) to can make a shared [pool](https://github.com/coopernurse/node-pool#createpool) of Puppeteer Pages.  We will pull `browser.newPage()` out of `scrapePage`, and make a simple `pageFactory` to specify how our pool will `create` and `destroy` pages:
+How to improve, then? Conceptually, one can think of Puppeteer's headless Chrome browser as a [shared resource.](https://pdfs.semanticscholar.org/ba17/4c6f41a24a54726eaf81c187a8dd7907766c.pdf)  In this scenario, we want to throttle the amount of pages that are spawned by the shared resource as we map over our list of page urls.  We can model this with the npm package [generic-pool](https://github.com/coopernurse/node-pool#readme) to make a shared [pool](https://github.com/coopernurse/node-pool#createpool) of Puppeteer Pages.  We will pull `browser.newPage()` out of `scrapePage`, and then make a simple `pageFactory` to specify how our pool will `create` and `destroy` pages:
 
 
 ```typescript
@@ -157,6 +157,6 @@ const scapePages = async (browser: Browser, urls: string[]) => {
 }
 ```
 
-Each concurrent async function that is invoked as we `map` over the `urls` array calls `pagePool.acquire`.  We set `{ max: 5 }`, so the first 5 functions immediately acquire puppeteer Pages.  The remaining functions are paused until one of the first 5 functions invoke `pagePool.release`, then `pagePool` disposes of that Page, and then `acquire()` resolves with a `create`d Page.
+Each concurrent async function that is invoked as we `map` over the `urls` array calls `pagePool.acquire`.  We set `{ max: 5 }`, so the first 5 functions immediately acquire puppeteer Pages.  The remaining functions are paused until one of the first 5 functions invokes `pagePool.release`, then `pagePool` disposes of that Page, and then `acquire()` resolves with a `create`d Page.
 
 We can now specify the max number of Pages open concurrently.  This throttling solves the Node crashing, website nuking, and TOS violating problems.  It also removes Page creating responsibilities from `scrapePage`, which now _only_ aggregates page interactions (thus better separating concerns).  The factory abstraction also paves the way for more interesting optimizations, e.g. [recycling Page objects.](https://unity3d.com/learn/tutorials/topics/2d-game-creation/recycling-obstacles-object-pooling) Despite these benefits, it admittedly also adds non-trivial [conceptual complexity](http://reviewthecode.blogspot.com/2016/01/wtf-per-minute-actual-measurement-for.html) to our `scapePages` implementation. 
