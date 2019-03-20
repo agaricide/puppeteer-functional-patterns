@@ -68,7 +68,7 @@ When `await` is used one after another, each await is resolved in blocking seque
 
 In the `scrapePage` method, `scrapeTitle` is not invoked until `tags` is resolved because of `await`. However, in this scenario it actually doesn't cost much. The `Page` object **can only execute 1 `evaluate` at a time**, and thus `scrapeTags`, `scrapeTitle`, and `scrapeAuthor` will be executed in blocking sequential order no matter what.
 
-I want to note that it's possible to kick off all the `Promise` returning methods at once and wait for all of them to resolve at the end.  [Destructuring assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment) + [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) + [pure functions](https://medium.com/javascript-scene/master-the-javascript-interview-what-is-a-pure-function-d1c076bec976) can be useful and expressive with `await`:
+I want to note that it's possible to kick off all the `Promise` returning functions at once, and then wait for all of them to resolve together.  [Destructuring assignment](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment) + [Promise.all](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/all) + [pure functions](https://medium.com/javascript-scene/master-the-javascript-interview-what-is-a-pure-function-d1c076bec976) can be useful and expressive with `await`:
 
 ```typescript
 const scrapePage = async (browser: Browser, url: string) => {
