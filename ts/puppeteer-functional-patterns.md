@@ -147,13 +147,13 @@ const scrapePage = async (page: Page, url: string) => {
 
 const scapePages = async (browser: Browser, urls: string[]) => {
   const pagePool = pool.createPool(pageFactory(browser), { max: 5 });
-  const promises = urls.map(async (url) => {
+  const tasks = urls.map(async (url) => {
     const page = await pagePool.acquire();
-    const data = await scrapeMugshot(page, url);
+    const data = await scrapePage(page, url);
     pagePool.release(page);
     return data;
   });
-  return Promise.all(promises);
+  return Promise.all(tasks);
 }
 ```
 
