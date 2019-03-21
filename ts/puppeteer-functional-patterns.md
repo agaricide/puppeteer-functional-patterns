@@ -6,7 +6,7 @@ Puppeteer tutorials have been extremely popular recently.<a href="https://www.re
 
 ## Organizing Page Interactions
 
-Below is a function that accepts a Puppeteer [Browser](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-browser) object and a string url.  It creates a [Page](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-page) object, and then scrapes an Array of string tags from that page.  Note that Puppeteer may [not be the ideal tool](https://medium.com/@gajus/it-is-a-really-silly-idea-to-use-puppeteer-to-scrape-the-web-da62a9f3de7e) for every web scraping project (but one could use this to organize other Page methods, too):
+Below is a function that accepts a Puppeteer [Browser](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-browser) object and a string url.  It creates a [Page](https://pptr.dev/#?product=Puppeteer&version=v1.13.0&show=api-class-page) object, and then scrapes an Array of string tags from that page.  Note that Puppeteer may [not be the ideal tool](https://medium.com/@gajus/it-is-a-really-silly-idea-to-use-puppeteer-to-scrape-the-web-da62a9f3de7e) for every web scraping project (but you could use this to organize other Page methods, too):
 
 ```typescript
 const async scrapePage = (browser: Browser, url: string) => {
@@ -125,9 +125,9 @@ const scrapePages = (browser: Browser, urls: string[]) => {
 }
 ```
 
-This is a naive attempt at opening many pages in parallel.  It attempts to open up 5,000 headless Chrome windows at once, and it's awful.  It will crash Node.  It will also nuke the website that is being scraped.  If one is trying to scrape data from a website and that is against the TOS, this might get them in trouble.  Likewise if the website has API limits.  Opening 5,000 Chrome windows at once is an accident under most circumstances.
+This is a naive attempt at opening many pages in parallel.  It attempts to open up 5,000 headless Chrome windows at once, and it's awful.  It will crash Node.  It will also nuke the website that is being scraped.  If your trying to scrape data from a website and that is against the TOS, this might get you in trouble.  Likewise if the website has API limits.  Opening 5,000 Chrome windows at once is an accident under most circumstances.
 
-How to improve, then? Conceptually, one can think of Puppeteer's headless Chrome browser as a [shared resource.](https://pdfs.semanticscholar.org/ba17/4c6f41a24a54726eaf81c187a8dd7907766c.pdf)  In this scenario, we want to throttle the amount of pages that are spawned by the shared resource as we map over our list of page urls.  We can model this with the npm package [generic-pool](https://github.com/coopernurse/node-pool#readme) to make a shared [pool](https://github.com/coopernurse/node-pool#createpool) of Puppeteer Pages.  We will pull `browser.newPage()` out of `scrapePage`, and then make a simple `pageFactory` to specify how our pool will `create` and `destroy` pages:
+How to improve, then? Conceptually, you can think of Puppeteer's headless Chrome browser as a [shared resource.](https://pdfs.semanticscholar.org/ba17/4c6f41a24a54726eaf81c187a8dd7907766c.pdf)  In this scenario, we want to throttle the amount of pages that are spawned by the shared resource as we map over our list of page urls.  We can model this with the npm package [generic-pool](https://github.com/coopernurse/node-pool#readme) to make a shared [pool](https://github.com/coopernurse/node-pool#createpool) of Puppeteer Pages.  We will pull `browser.newPage()` out of `scrapePage`, and then make a simple `pageFactory` to specify how our pool will `create` and `destroy` pages:
 
 
 ```typescript
