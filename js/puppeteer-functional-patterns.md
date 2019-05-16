@@ -21,7 +21,7 @@ const async scrapePage = (browser, url) => {
 }
 ```
 
-This looks okay, but imagine that you want scrape more data.  Say, `n` more fields.  Here, `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could easily grow to 100+ lines with only a few interactions. Let's extract the `page.evaluate` invocation to a new function and scrape some more fields:
+This looks okay, but imagine that you want scrape more data.  Say, `n` more fields.  Then `scrapePage` has many responsibilities– it creates and disposes a page + performs `n` page interactions.  The `scrapePage` method could easily grow to 100+ lines with only a few interactions. Let's extract the `page.evaluate` invocation to a new function and scrape some more fields:
 
 ```javascript
 const scrapeTags = (page) => {
@@ -62,7 +62,7 @@ const scrapePage = async (browser, url) => {
 }
 ```
 
-Done.  Now our page interactions are organized into a handful of small, pure, easy-to-understand functions, and we can easily add more.  They are also easy to order and arrange.  Bonus: Typescript infers the return type of `scrapeTags` without explicitly specifying.
+Done.  Now our page interactions are organized into a handful of pure, easy-to-understand functions, and we can easily add more.  They are also easy to order and arrange.  Bonus: Typescript infers the return type of `scrapeTags` without explicitly specifying.
 
 ## A note on using `async` `await` with `Page`
 
